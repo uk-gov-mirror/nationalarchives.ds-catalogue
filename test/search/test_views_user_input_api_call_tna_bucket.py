@@ -114,3 +114,30 @@ class CatalogueSearchViewDebugAPITnaBucketTests(TestCase):
         mock_logger.debug.assert_called_with(
             "https://rosetta.test/data/search?aggs=level&aggs=collection&aggs=closure&aggs=subject&filter=group%3Atna&filter=openingFromDate%3A%28%3E%3D2000-12-1%29&filter=openingToDate%3A%28%3C%3D2000-12-31%29&q=%2A&size=20"
         )
+
+        # Test online filter (digitised parameter)
+        response = self.client.get("/catalogue/search/?group=tna&online=true")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        actual_url = mock_logger.debug.call_args[0][0]
+
+        self.assertIn("digitised=true", actual_url)
+
+        self.assertNotIn("filter=digitised", actual_url)
+        self.assertNotIn("digitised%3Atrue", actual_url)  # URL encoded version
+
+        # Test online filter with other filters combined
+        response = self.client.get(
+            "/catalogue/search/?group=tna&online=true&q=test&level=Item"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        actual_url = mock_logger.debug.call_args[0][0]
+        self.assertIn("digitised=true", actual_url)
+        self.assertIn("filter=level%3AItem", actual_url)  # level as filter
+        self.assertNotIn("filter=digitised", actual_url)  # NOT as filter
+
+        # Test that online filter is NOT applied when online=false or not specified
+        response = self.client.get("/catalogue/search/?group=tna&q=test")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        actual_url = mock_logger.debug.call_args[0][0]
+        # digitised parameter should NOT be in the URL
+        self.assertNotIn("digitised", actual_url)
